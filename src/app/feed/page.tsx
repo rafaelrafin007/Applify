@@ -1,3 +1,12 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { PostVisibility } from "@prisma/client";
+import type { Session } from "next-auth";
+
+import { authOptions } from "@/lib/auth";
+import CreatePostForm from "@/components/feed/CreatePostForm";
+import prisma from "@/lib/prisma";
+
 const suggestedPeople = [
   { name: "Steve Jobs", role: "CEO of Apple", image: "/assets/images/people1.png" },
   { name: "Ryan Roslansky", role: "CEO of Linkedin", image: "/assets/images/people2.png" },
@@ -10,25 +19,6 @@ const stories = [
   { image: "/assets/images/card_ppl4.png", name: "Steve Jobs" },
 ];
 
-const posts = [
-  {
-    id: "p1",
-    author: "Karim Saif",
-    time: "5 minute ago",
-    visibility: "Public",
-    title: "-Healthy Tracking App",
-    image: "/assets/images/timeline_img.png",
-  },
-  {
-    id: "p2",
-    author: "Karim Saif",
-    time: "12 minute ago",
-    visibility: "Public",
-    title: "-Productivity Setup",
-    image: "/assets/images/timeline_img.png",
-  },
-];
-
 const friends = [
   { name: "Steve Jobs", role: "CEO of Apple", image: "/assets/images/people1.png", online: false },
   { name: "Ryan Roslansky", role: "CEO of Linkedin", image: "/assets/images/people2.png", online: true },
@@ -36,7 +26,142 @@ const friends = [
   { name: "Steve Jobs", role: "CEO of Apple", image: "/assets/images/people1.png", online: false },
 ];
 
-export default function FeedPage() {
+function getUserIdFromSession(session: Session | null): string | null {
+  const user = session?.user as (Session["user"] & { id?: string }) | undefined;
+  return user?.id ?? null;
+}
+
+function formatRelativeTime(date: Date) {
+  const diffMs = date.getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / 60000);
+  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+  if (Math.abs(diffMinutes) < 60) {
+    return formatter.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return formatter.format(diffHours, "hour");
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  return formatter.format(diffDays, "day");
+}
+
+export default async function FeedPage() {
+  const session = await getServerSession(authOptions);
+  const userId = getUserIdFromSession(session);
+
+  if (!userId) {
+    redirect("/login");
+  }
+
+  const posts = await prisma.post.findMany({
+    where: {
+      OR: [{ visibility: PostVisibility.PUBLIC }, { authorId: userId }],
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      content: true,
+      imageUrl: true,
+      visibility: true,
+      createdAt: true,
+      author: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+      likes: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          userId: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      },
+      comments: {
+        where: {
+          parentCommentId: null,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          author: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+          likes: {
+            orderBy: {
+              createdAt: "desc",
+            },
+            select: {
+              userId: true,
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          },
+          replies: {
+            orderBy: {
+              createdAt: "asc",
+            },
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              author: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              likes: {
+                orderBy: {
+                  createdAt: "desc",
+                },
+                select: {
+                  userId: true,
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
   return (
     <div className="_layout _layout_main_wrapper">
       <div className="_main_layout">
@@ -237,135 +362,233 @@ export default function FeedPage() {
                       </div>
                     </div>
 
-                    <div className="_feed_inner_text_area _b_radious6 _padd_b24 _padd_t24 _padd_r24 _padd_l24 _mar_b16">
-                      <div className="_feed_inner_text_area_box">
-                        <div className="_feed_inner_text_area_box_image">
-                          <img src="/assets/images/txt_img.png" alt="User avatar" className="_txt_img" />
-                        </div>
-                        <div className="form-floating _feed_inner_text_area_box_form">
-                          <textarea
-                            className="form-control _textarea"
-                            placeholder="Write something"
-                            id="feed-post-box"
-                            defaultValue=""
-                          />
-                          <label className="_feed_textarea_label" htmlFor="feed-post-box">
-                            Write something ...
-                          </label>
-                        </div>
-                      </div>
+                    <CreatePostForm />
 
-                      <div className="_feed_inner_text_area_bottom">
-                        <div className="_feed_inner_text_area_item">
-                          <div className="_feed_inner_text_area_bottom_photo _feed_common">
-                            <button type="button" className="_feed_inner_text_area_bottom_photo_link" disabled>
-                              Photo
-                            </button>
-                          </div>
-                          <div className="_feed_inner_text_area_bottom_video _feed_common">
-                            <button type="button" className="_feed_inner_text_area_bottom_photo_link" disabled>
-                              Video
-                            </button>
-                          </div>
-                          <div className="_feed_inner_text_area_bottom_event _feed_common">
-                            <button type="button" className="_feed_inner_text_area_bottom_photo_link" disabled>
-                              Event
-                            </button>
-                          </div>
-                          <div className="_feed_inner_text_area_bottom_article _feed_common">
-                            <button type="button" className="_feed_inner_text_area_bottom_photo_link" disabled>
-                              Article
-                            </button>
-                          </div>
-                        </div>
-                        <div className="_feed_inner_text_area_btn">
-                          <button type="button" className="_feed_inner_text_area_btn_link" disabled>
-                            <span>Post</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {posts.map((post) => (
-                      <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _mar_b16" key={post.id}>
+                    {posts.length === 0 ? (
+                      <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _mar_b16">
                         <div className="_feed_inner_timeline_content _padd_r24 _padd_l24">
-                          <div className="_feed_inner_timeline_post_top">
-                            <div className="_feed_inner_timeline_post_box">
-                              <div className="_feed_inner_timeline_post_box_image">
-                                <img src="/assets/images/post_img.png" alt={post.author} className="_post_img" />
+                          <h4 className="_feed_inner_timeline_post_title">No posts yet. Create the first post.</h4>
+                        </div>
+                      </div>
+                    ) : (
+                      posts.map((post) => {
+                        const totalComments = post.comments.reduce((count, comment) => count + 1 + comment.replies.length, 0);
+                        const postLikedByCurrentUser = post.likes.some((like) => like.userId === userId);
+
+                        return (
+                          <div className="_feed_inner_timeline_post_area _b_radious6 _padd_b24 _padd_t24 _mar_b16" key={post.id}>
+                            <div className="_feed_inner_timeline_content _padd_r24 _padd_l24">
+                              <div className="_feed_inner_timeline_post_top">
+                                <div className="_feed_inner_timeline_post_box">
+                                  <div className="_feed_inner_timeline_post_box_image">
+                                    <img src="/assets/images/post_img.png" alt={`${post.author.firstName} ${post.author.lastName}`} className="_post_img" />
+                                  </div>
+                                  <div className="_feed_inner_timeline_post_box_txt">
+                                    <h4 className="_feed_inner_timeline_post_box_title">
+                                      {post.author.firstName} {post.author.lastName}
+                                    </h4>
+                                    <p className="_feed_inner_timeline_post_box_para">
+                                      {formatRelativeTime(post.createdAt)} . <span>{post.visibility === "PUBLIC" ? "Public" : "Private"}</span>
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="_feed_inner_timeline_post_box_dropdown">
+                                  <button
+                                    type="button"
+                                    className="_feed_timeline_post_dropdown_link"
+                                    disabled
+                                    title="Post options are static in Phase 1."
+                                  >
+                                    ...
+                                  </button>
+                                </div>
                               </div>
-                              <div className="_feed_inner_timeline_post_box_txt">
-                                <h4 className="_feed_inner_timeline_post_box_title">{post.author}</h4>
-                                <p className="_feed_inner_timeline_post_box_para">
-                                  {post.time} . <span>{post.visibility}</span>
+
+                              <h4 className="_feed_inner_timeline_post_title">{post.content}</h4>
+                              {post.imageUrl ? (
+                                <div className="_feed_inner_timeline_image">
+                                  <img src={post.imageUrl} alt="Post" className="_time_img" />
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="_feed_inner_timeline_total_reacts _padd_r24 _padd_l24 _mar_b26">
+                              <div className="_feed_inner_timeline_total_reacts_image">
+                                <img src="/assets/images/react_img1.png" alt="React" className="_react_img1" />
+                                <img src="/assets/images/react_img2.png" alt="React" className="_react_img" />
+                                <img src="/assets/images/react_img3.png" alt="React" className="_react_img _rect_img_mbl_none" />
+                                <img src="/assets/images/react_img4.png" alt="React" className="_react_img _rect_img_mbl_none" />
+                                <img src="/assets/images/react_img5.png" alt="React" className="_react_img _rect_img_mbl_none" />
+                                <p className="_feed_inner_timeline_total_reacts_para">{post.likes.length}</p>
+                              </div>
+                              <div className="_feed_inner_timeline_total_reacts_txt">
+                                <p className="_feed_inner_timeline_total_reacts_para1">
+                                  <span>{totalComments}</span> Comment
+                                </p>
+                                <p className="_feed_inner_timeline_total_reacts_para2">
+                                  <span>0</span> Share
                                 </p>
                               </div>
                             </div>
-                            <div className="_feed_inner_timeline_post_box_dropdown">
-                              <button
-                                type="button"
-                                className="_feed_timeline_post_dropdown_link"
-                                disabled
-                                title="Post options are static in Phase 1."
-                              >
-                                ...
+
+                            <div className="_feed_inner_timeline_reaction">
+                              <form action={`/api/posts/${post.id}/like`} method="post">
+                                <button className="_feed_inner_timeline_reaction_emoji _feed_reaction _feed_reaction_active" type="submit">
+                                  <span className="_feed_inner_timeline_reaction_link">{postLikedByCurrentUser ? "Unlike" : "Like"}</span>
+                                </button>
+                              </form>
+                              <button className="_feed_inner_timeline_reaction_comment _feed_reaction" type="button" disabled>
+                                <span className="_feed_inner_timeline_reaction_link">Comment</span>
+                              </button>
+                              <button className="_feed_inner_timeline_reaction_share _feed_reaction" type="button" disabled>
+                                <span className="_feed_inner_timeline_reaction_link">Share</span>
                               </button>
                             </div>
-                          </div>
 
-                          <h4 className="_feed_inner_timeline_post_title">{post.title}</h4>
-                          <div className="_feed_inner_timeline_image">
-                            <img src={post.image} alt={post.title} className="_time_img" />
-                          </div>
-                        </div>
+                            <div className="_feed_inner_timeline_cooment_area">
+                              <div className="_feed_inner_comment_box">
+                                <details style={{ marginBottom: "10px" }}>
+                                  <summary>{post.likes.length} post like(s)</summary>
+                                  <div style={{ marginTop: "6px" }}>
+                                    {post.likes.length === 0 ? (
+                                      <p style={{ margin: 0 }}>No likes yet.</p>
+                                    ) : (
+                                      <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                                        {post.likes.map((like) => (
+                                          <li key={like.user.id}>
+                                            {like.user.firstName} {like.user.lastName} ({like.user.email})
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                </details>
 
-                        <div className="_feed_inner_timeline_total_reacts _padd_r24 _padd_l24 _mar_b26">
-                          <div className="_feed_inner_timeline_total_reacts_image">
-                            <img src="/assets/images/react_img1.png" alt="React" className="_react_img1" />
-                            <img src="/assets/images/react_img2.png" alt="React" className="_react_img" />
-                            <img src="/assets/images/react_img3.png" alt="React" className="_react_img _rect_img_mbl_none" />
-                            <img src="/assets/images/react_img4.png" alt="React" className="_react_img _rect_img_mbl_none" />
-                            <img src="/assets/images/react_img5.png" alt="React" className="_react_img _rect_img_mbl_none" />
-                            <p className="_feed_inner_timeline_total_reacts_para">9+</p>
-                          </div>
-                          <div className="_feed_inner_timeline_total_reacts_txt">
-                            <p className="_feed_inner_timeline_total_reacts_para1">
-                              <span>12</span> Comment
-                            </p>
-                            <p className="_feed_inner_timeline_total_reacts_para2">
-                              <span>122</span> Share
-                            </p>
-                          </div>
-                        </div>
+                                <form className="_feed_inner_comment_box_form" action={`/api/posts/${post.id}/comments`} method="post">
+                                  <div className="_feed_inner_comment_box_content">
+                                    <div className="_feed_inner_comment_box_content_image">
+                                      <img src="/assets/images/comment_img.png" alt="Comment avatar" className="_comment_img" />
+                                    </div>
+                                    <div className="_feed_inner_comment_box_content_txt">
+                                      <textarea className="form-control _comment_textarea" placeholder="Write a comment" name="content" required />
+                                    </div>
+                                    <div className="_feed_inner_text_area_btn">
+                                      <button type="submit" className="_feed_inner_text_area_btn_link">
+                                        <span>Comment</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </form>
 
-                        <div className="_feed_inner_timeline_reaction">
-                          <button className="_feed_inner_timeline_reaction_emoji _feed_reaction _feed_reaction_active" type="button" disabled>
-                            <span className="_feed_inner_timeline_reaction_link">Haha</span>
-                          </button>
-                          <button className="_feed_inner_timeline_reaction_comment _feed_reaction" type="button" disabled>
-                            <span className="_feed_inner_timeline_reaction_link">Comment</span>
-                          </button>
-                          <button className="_feed_inner_timeline_reaction_share _feed_reaction" type="button" disabled>
-                            <span className="_feed_inner_timeline_reaction_link">Share</span>
-                          </button>
-                        </div>
+                                {post.comments.length > 0 ? (
+                                  <div style={{ marginTop: "14px", display: "grid", gap: "10px" }}>
+                                    {post.comments.map((comment) => {
+                                      const commentLikedByCurrentUser = comment.likes.some((like) => like.userId === userId);
 
-                        <div className="_feed_inner_timeline_cooment_area">
-                          <div className="_feed_inner_comment_box">
-                            <form className="_feed_inner_comment_box_form">
-                              <div className="_feed_inner_comment_box_content">
-                                <div className="_feed_inner_comment_box_content_image">
-                                  <img src="/assets/images/comment_img.png" alt="Comment avatar" className="_comment_img" />
-                                </div>
-                                <div className="_feed_inner_comment_box_content_txt">
-                                  <textarea className="form-control _comment_textarea" placeholder="Write a comment" defaultValue="" />
-                                </div>
+                                      return (
+                                        <div key={comment.id} style={{ padding: "10px", borderRadius: "8px", background: "#f8f9fb" }}>
+                                          <p style={{ margin: 0, fontWeight: 600 }}>
+                                            {comment.author.firstName} {comment.author.lastName}
+                                          </p>
+                                          <p style={{ margin: "4px 0 8px 0" }}>{comment.content}</p>
+                                          <p style={{ margin: 0, fontSize: "12px", opacity: 0.7 }}>{formatRelativeTime(comment.createdAt)}</p>
+
+                                          <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                            <form action={`/api/comments/${comment.id}/like`} method="post">
+                                              <button type="submit" className="_feed_inner_text_area_btn_link" style={{ minWidth: "92px" }}>
+                                                <span>{commentLikedByCurrentUser ? "Unlike" : "Like"}</span>
+                                              </button>
+                                            </form>
+                                            <span style={{ fontSize: "13px" }}>{comment.likes.length} like(s)</span>
+                                            <details>
+                                              <summary>View likes</summary>
+                                              <div style={{ marginTop: "6px" }}>
+                                                {comment.likes.length === 0 ? (
+                                                  <p style={{ margin: 0 }}>No likes yet.</p>
+                                                ) : (
+                                                  <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                                                    {comment.likes.map((like) => (
+                                                      <li key={like.user.id}>
+                                                        {like.user.firstName} {like.user.lastName} ({like.user.email})
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                )}
+                                              </div>
+                                            </details>
+                                          </div>
+
+                                          <form
+                                            action={`/api/comments/${comment.id}/replies`}
+                                            method="post"
+                                            style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}
+                                          >
+                                            <input
+                                              type="text"
+                                              name="content"
+                                              className="form-control"
+                                              placeholder="Write a reply"
+                                              required
+                                            />
+                                            <button type="submit" className="_feed_inner_text_area_btn_link" style={{ minWidth: "86px" }}>
+                                              <span>Reply</span>
+                                            </button>
+                                          </form>
+
+                                          {comment.replies.length > 0 ? (
+                                            <div style={{ marginTop: "10px", paddingLeft: "12px", borderLeft: "2px solid #e5e7eb", display: "grid", gap: "8px" }}>
+                                              {comment.replies.map((reply) => {
+                                                const replyLikedByCurrentUser = reply.likes.some((like) => like.userId === userId);
+
+                                                return (
+                                                  <div key={reply.id} style={{ background: "#fff", borderRadius: "6px", padding: "8px" }}>
+                                                    <p style={{ margin: 0, fontWeight: 600 }}>
+                                                      {reply.author.firstName} {reply.author.lastName}
+                                                    </p>
+                                                    <p style={{ margin: "3px 0 6px 0" }}>{reply.content}</p>
+                                                    <p style={{ margin: 0, fontSize: "12px", opacity: 0.7 }}>
+                                                      {formatRelativeTime(reply.createdAt)}
+                                                    </p>
+                                                    <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                                      <form action={`/api/comments/${reply.id}/like`} method="post">
+                                                        <button type="submit" className="_feed_inner_text_area_btn_link" style={{ minWidth: "92px" }}>
+                                                          <span>{replyLikedByCurrentUser ? "Unlike" : "Like"}</span>
+                                                        </button>
+                                                      </form>
+                                                      <span style={{ fontSize: "13px" }}>{reply.likes.length} like(s)</span>
+                                                      <details>
+                                                        <summary>View likes</summary>
+                                                        <div style={{ marginTop: "6px" }}>
+                                                          {reply.likes.length === 0 ? (
+                                                            <p style={{ margin: 0 }}>No likes yet.</p>
+                                                          ) : (
+                                                            <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                                                              {reply.likes.map((like) => (
+                                                                <li key={like.user.id}>
+                                                                  {like.user.firstName} {like.user.lastName} ({like.user.email})
+                                                                </li>
+                                                              ))}
+                                                            </ul>
+                                                          )}
+                                                        </div>
+                                                      </details>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
                               </div>
-                            </form>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>

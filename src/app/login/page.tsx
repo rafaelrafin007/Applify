@@ -1,4 +1,41 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage("");
+    setIsLoading(true);
+
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+
+      if (result?.error) {
+        setErrorMessage("Invalid email or password.");
+        return;
+      }
+
+      router.push("/feed");
+    } catch {
+      setErrorMessage("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <section className="_social_login_wrapper _layout_main_wrapper">
       <div className="_shape_one">
@@ -51,14 +88,21 @@ export default function LoginPage() {
                 <div className="_social_login_content_bottom_txt _mar_b40">
                   <span>Or</span>
                 </div>
-                <form className="_social_login_form">
+                <form className="_social_login_form" onSubmit={handleSubmit}>
                   <div className="row">
                     <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
                       <div className="_social_login_form_input _mar_b14">
                         <label className="_social_login_label _mar_b8" htmlFor="email">
                           Email
                         </label>
-                        <input id="email" type="email" className="form-control _social_login_input" />
+                        <input
+                          id="email"
+                          type="email"
+                          className="form-control _social_login_input"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                          required
+                        />
                       </div>
                     </div>
                     <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
@@ -70,6 +114,9 @@ export default function LoginPage() {
                           id="password"
                           type="password"
                           className="form-control _social_login_input"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          required
                         />
                       </div>
                     </div>
@@ -103,12 +150,22 @@ export default function LoginPage() {
                   <div className="row">
                     <div className="col-lg-12 col-md-12 col-xl-12 col-sm-12">
                       <div className="_social_login_form_btn _mar_t40 _mar_b60">
-                        <button type="submit" className="_social_login_form_btn_link _btn1">
-                          Login now
+                        <button
+                          type="submit"
+                          className="_social_login_form_btn_link _btn1"
+                          disabled={isLoading}
+                          aria-disabled={isLoading}
+                        >
+                          {isLoading ? "Logging in..." : "Login now"}
                         </button>
                       </div>
                     </div>
                   </div>
+                  {errorMessage ? (
+                    <p className="_social_login_content_para _mar_b8" role="alert">
+                      {errorMessage}
+                    </p>
+                  ) : null}
                 </form>
                 <div className="row">
                   <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">

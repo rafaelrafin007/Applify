@@ -1,4 +1,65 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+
 export default function RegisterPage() {
+  const router = useRouter();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          password,
+        }),
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            details?: Record<string, string[]>;
+          }
+        | null;
+
+      if (!response.ok) {
+        const firstFieldError =
+          data?.details &&
+          Object.values(data.details).find((messages) => Array.isArray(messages) && messages.length > 0)?.[0];
+
+        setErrorMessage(firstFieldError ?? data?.error ?? "Registration failed");
+        return;
+      }
+
+      setSuccessMessage("Registration successful. Redirecting to login...");
+      setTimeout(() => {
+        router.push("/login");
+      }, 900);
+    } catch {
+      setErrorMessage("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <section className="_social_registration_wrapper _layout_main_wrapper">
       <div className="_shape_one">
@@ -59,7 +120,7 @@ export default function RegisterPage() {
                   <span>Or</span>
                 </div>
 
-                <form className="_social_registration_form">
+                <form className="_social_registration_form" onSubmit={handleSubmit}>
                   <div className="row">
                     <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
                       <div className="_social_registration_form_input _mar_b14">
@@ -70,6 +131,9 @@ export default function RegisterPage() {
                           id="firstName"
                           type="text"
                           className="form-control _social_registration_input"
+                          value={firstName}
+                          onChange={(event) => setFirstName(event.target.value)}
+                          required
                         />
                       </div>
                     </div>
@@ -83,6 +147,9 @@ export default function RegisterPage() {
                           id="lastName"
                           type="text"
                           className="form-control _social_registration_input"
+                          value={lastName}
+                          onChange={(event) => setLastName(event.target.value)}
+                          required
                         />
                       </div>
                     </div>
@@ -92,7 +159,14 @@ export default function RegisterPage() {
                         <label className="_social_registration_label _mar_b8" htmlFor="email">
                           Email
                         </label>
-                        <input id="email" type="email" className="form-control _social_registration_input" />
+                        <input
+                          id="email"
+                          type="email"
+                          className="form-control _social_registration_input"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                          required
+                        />
                       </div>
                     </div>
 
@@ -105,6 +179,9 @@ export default function RegisterPage() {
                           id="password"
                           type="password"
                           className="form-control _social_registration_input"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          required
                         />
                       </div>
                     </div>
@@ -134,12 +211,26 @@ export default function RegisterPage() {
                   <div className="row">
                     <div className="col-lg-12 col-md-12 col-xl-12 col-sm-12">
                       <div className="_social_registration_form_btn _mar_t40 _mar_b60">
-                        <button type="submit" className="_social_registration_form_btn_link _btn1">
-                          Register now
+                        <button
+                          type="submit"
+                          className="_social_registration_form_btn_link _btn1"
+                          disabled={isLoading}
+                          aria-disabled={isLoading}
+                        >
+                          {isLoading ? "Registering..." : "Register now"}
                         </button>
                       </div>
                     </div>
                   </div>
+
+                  {errorMessage ? (
+                    <p className="_social_registration_content_para _mar_b16" role="alert">
+                      {errorMessage}
+                    </p>
+                  ) : null}
+                  {successMessage ? (
+                    <p className="_social_registration_content_para _mar_b16">{successMessage}</p>
+                  ) : null}
                 </form>
 
                 <div className="row">
