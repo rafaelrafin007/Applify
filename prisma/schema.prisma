@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PostVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+model User {
+  id           String        @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  posts        Post[]
+  comments     Comment[]
+  postLikes    PostLike[]
+  commentLikes CommentLike[]
+}
+
+model Post {
+  id         String         @id @default(cuid())
+  authorId   String
+  content    String
+  imageUrl   String?
+  visibility PostVisibility @default(PUBLIC)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  author     User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments   Comment[]
+  likes      PostLike[]
+
+  @@index([authorId])
+  @@index([visibility, createdAt])
+  @@index([createdAt])
+}
+
+model Comment {
+  id              String        @id @default(cuid())
+  postId          String
+  authorId        String
+  parentCommentId String?
+  content         String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  post            Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentComment   Comment?      @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         Comment[]     @relation("CommentReplies")
+  likes           CommentLike[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentCommentId])
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId])
+}
