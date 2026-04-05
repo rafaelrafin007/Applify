@@ -59,7 +59,7 @@ export default function RegisterPage() {
                   <span>Or</span>
                 </div>
 
-                <form className="_social_registration_form" onSubmit={(e) => e.preventDefault()}>
+                <form className="_social_registration_form">
                   <div className="row">
                     <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12">
                       <div className="_social_registration_form_input _mar_b14">
