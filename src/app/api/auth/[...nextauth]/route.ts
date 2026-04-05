@@ -1,25 +1,7 @@
-import { NextResponse } from "next/server";
+import NextAuth from "next-auth";
 
-function notImplemented() {
-  return NextResponse.json({ error: "Not implemented yet" }, { status: 501 });
-}
+import { authOptions } from "@/lib/auth";
 
-export async function GET() {
-  return notImplemented();
-}
+const handler = NextAuth(authOptions);
 
-export async function POST() {
-  return notImplemented();
-}
-
-export async function PUT() {
-  return notImplemented();
-}
-
-export async function PATCH() {
-  return notImplemented();
-}
-
-export async function DELETE() {
-  return notImplemented();
-}
+export { handler as GET, handler as POST };
