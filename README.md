@@ -10,7 +10,7 @@ This project was built for the **Appifylab Full Stack Developer assessment** bas
 
 - **Live URL:** https://applify-beta.vercel.app/
 - **GitHub Repository:** https://github.com/rafaelrafin007/Applify
-- **Video Walkthrough:** [Add your YouTube unlisted/private link here]
+- **Video Walkthrough:** https://youtu.be/dDEKg8herRc
 
 ---
 
